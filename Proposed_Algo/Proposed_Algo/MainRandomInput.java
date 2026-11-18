@@ -1,25 +1,17 @@
 package Proposed_Algo;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Scanner;
 
 import Proposed_Algo.Main.Binarycases;
-import Proposed_Algo.Main.criteria_Weight;
 import Proposed_Algo.Main.fogNode;
 import Proposed_Algo.Main.iotDevice;
 
 public class MainRandomInput {
 	static int caseDistribution[] = new int[4];
 	
-	static class criteria_Weight
-	  {
-	    double CW_of_Energy_of_iot;
-	    double CW_of_Latency_of_iot;
-	    double CW_of_Computational_demand_of_iot;
-	    double CW_of_Energy_of_fog;
-	    double CW_of_deadline_of_fog;
-	  }
-	  //class for fog node ranking using AHP
+	  //class for fog node ranking (TOPSIS)
 	  static class fogNode
 	  {
 	    int Id;
@@ -108,217 +100,184 @@ public class MainRandomInput {
 	  }
 	  
 	  
-	  public static criteria_Weight AHP ()
+  // ---------------------------------------------------------------------------
+  //  TOPSIS ranking (replaces AHP). Weights come from the Entropy method.
+  // ---------------------------------------------------------------------------
+
+  // true  -> a HIGHER value of a criterion gives a HIGHER rank (same behaviour as the old
+  //          weighted-sum + descending sort).
+  // false -> a LOWER value gives a higher rank (cost-style: cheapest / fastest first).
+  static final boolean HIGHER_VALUE_FIRST = true;
+
+  // Entropy weight method: a criterion whose values differ a lot between alternatives
+  // carries more information, so it gets a bigger weight. Weights always sum to 1.
+  public static double[] entropyWeights (double[][] m)
+  {
+    int rows = m.length;
+    int cols = m[0].length;
+    double[] w = new double[cols];
+
+    //with a single alternative there is nothing to compare, so use equal weights
+    if (rows < 2)
+      {
+	for (int j = 0; j < cols; j++)
+	  w[j] = 1.0 / cols;
+	return w;
+      }
+
+    double k = 1.0 / Math.log (rows);
+    double[] d = new double[cols];
+    double dSum = 0;
+    for (int j = 0; j < cols; j++)
+      {
+	double colSum = 0;
+	for (int i = 0; i < rows; i++)
+	  colSum += m[i][j];
+
+	double entropy = 1;	//no information -> maximum entropy
+	if (colSum > 0)
 	  {
-	    criteria_Weight cw = new criteria_Weight ();
-
-	    //for fog node 
-	    //oth row/column energy
-	    //1st row/column latency
-	    //2nd  row/column computational demand
-	    //for fog node 
-	    double sum = 0;
-	    int n = 3;
-	    //for fog node
-	    double[][] standard_matrix = { {1.0, 4.0, 5.0},
-	    {0.25, 1.0, 3.0},
-	    {0.2, 0.33, 1.0}
-	    };
-	    //step one to calculate C.W.
-	    double[][] matrix_for_CW = new double[n][n];
-	    for (int i = 0; i < n; i++)
+	    entropy = 0;
+	    for (int i = 0; i < rows; i++)
 	      {
-		sum = 0;
-		for (int j = 0; j < n; j++)
-		  {
-		    sum = sum + standard_matrix[j][i];
-
-		  }
-		for (int j = 0; j < n; j++)
-		  {
-		    matrix_for_CW[j][i] = standard_matrix[j][i] / sum;
-		  }
-
+		double p = m[i][j] / colSum;
+		if (p > 0)
+		  entropy -= p * Math.log (p);
 	      }
-
-	    //since first is energy then latency then computational demand
-	    sum = 0;
-
-	    for (int i = 0; i < n; i++)
-	      {
-		sum = sum + matrix_for_CW[0][i];
-	      }
-
-	    cw.CW_of_Energy_of_iot = sum / n;
-	    sum = 0;
-	    for (int i = 0; i < n; i++)
-	      {
-		sum = sum + matrix_for_CW[1][i];
-	      }
-	    cw.CW_of_Latency_of_iot = sum / n;
-	    sum = 0;
-	    for (int i = 0; i < n; i++)
-	      {
-		sum = sum + matrix_for_CW[2][i];
-	      }
-	    cw.CW_of_Computational_demand_of_iot = sum / n;
-
-
-
-	    //matrix for WS 
-	    double[][] matrix_for_WS = new double[n][n];
-	    //defining variables for weighted sum accordingly
-	    double weighted_sum_of_energy = 0;
-	    double weighted_sum_of_latency = 0;
-	    double weighted_sum_of_computational_demand = 0;
-	    sum = 0;
-	    for (int i = 0; i < n; i++)
-	      {
-		matrix_for_WS[i][0] = cw.CW_of_Energy_of_iot * standard_matrix[i][0];
-
-	      }
-	    for (int i = 0; i < n; i++)
-	      {
-		matrix_for_WS[i][1] = cw.CW_of_Latency_of_iot * standard_matrix[i][1];
-
-	      }
-	    for (int i = 0; i < n; i++)
-	      {
-		matrix_for_WS[i][2] =
-		  cw.CW_of_Computational_demand_of_iot * standard_matrix[i][2];
-
-	      }
-
-	    //calculating weighted sum for all
-	    sum = 0;
-
-	    for (int i = 0; i < n; i++)
-	      {
-		weighted_sum_of_energy = weighted_sum_of_energy + matrix_for_CW[0][i];
-	      }
-
-	    for (int i = 0; i < n; i++)
-	      {
-		weighted_sum_of_latency =
-		  weighted_sum_of_latency + matrix_for_CW[1][i];
-	      }
-
-	    for (int i = 0; i < n; i++)
-	      {
-		weighted_sum_of_computational_demand =
-		  weighted_sum_of_computational_demand + matrix_for_CW[2][i];
-	      }
-
-	    double Energy_ratio = weighted_sum_of_energy / cw.CW_of_Energy_of_iot;
-
-	    double Latency_ratio = weighted_sum_of_latency / cw.CW_of_Latency_of_iot;
-	    double Computational_demand_ratio =
-	      weighted_sum_of_computational_demand /
-	      cw.CW_of_Computational_demand_of_iot;
-	    double lambda_max =
-	      (Energy_ratio + Latency_ratio + Computational_demand_ratio) / 3;
-	    double CI = (lambda_max - n) / (n - 1);
-	    double CR = CI / 0.58;	//random index is 0.58 for n=3;
-	    if (CR < 0.10)
-	      {
-		System.out.println ("Matrix is consistent");
-	      }
-
-	    //cw for iot device
-	    //oth row/column energy
-	    //1st row/column deadline
-	    double[][] standard_matrix_for_iot = { {1.0, 5.0},
-	    {0.2, 1.0}
-	    };
-	    n = 2;
-	    double[][] matrix_for_CW_of_iot = new double[n][n];
-	    for (int i = 0; i < n; i++)
-	      {
-		sum = 0;
-		for (int j = 0; j < n; j++)
-		  {
-		    sum = sum + standard_matrix_for_iot[j][i];
-
-		  }
-		for (int j = 0; j < n; j++)
-		  {
-		    matrix_for_CW_of_iot[j][i] = standard_matrix_for_iot[j][i] / sum;
-		  }
-
-	      }
-	    sum = 0;
-	    for (int i = 0; i < n; i++)
-	      {
-		sum = sum + matrix_for_CW_of_iot[0][i];
-	      }
-
-	    cw.CW_of_Energy_of_fog = sum / n;
-	    sum = 0;
-	    for (int i = 0; i < n; i++)
-	      {
-		sum = sum + matrix_for_CW_of_iot[1][i];
-	      }
-	    cw.CW_of_deadline_of_fog = sum / n;
-
-	    return cw;
-
-
+	    entropy = entropy * k;
 	  }
+	d[j] = 1 - entropy;	//degree of diversification
+	dSum += d[j];
+      }
 
+    for (int j = 0; j < cols; j++)
+      w[j] = (dSum > 1e-12) ? d[j] / dSum : 1.0 / cols;
+    return w;
+  }
 
-	  public static fogNode[] fogpreference (double downlink_data_rate,
-						 double uplink_data_rate,
-						 double output_size,
-						 double capacity_of_VRU)
+  // TOPSIS: returns one closeness score in [0,1] per row of the decision matrix.
+  // A score near 1 means "close to the ideal best, far from the ideal worst".
+  public static double[] topsisScores (double[][] m, String label)
+  {
+    int rows = m.length;
+    int cols = m[0].length;
+
+    //step 1: weights (entropy)
+    double[] w = entropyWeights (m);
+    System.out.println ("Entropy weights for " + label + " : " +
+			Arrays.toString (w));
+
+    //step 2 + 3: vector normalization, then multiply by the weight
+    double[][] v = new double[rows][cols];
+    for (int j = 0; j < cols; j++)
+      {
+	double squareSum = 0;
+	for (int i = 0; i < rows; i++)
+	  squareSum += m[i][j] * m[i][j];
+	double norm = Math.sqrt (squareSum);
+	for (int i = 0; i < rows; i++)
+	  v[i][j] = (norm > 0 ? m[i][j] / norm : 0) * w[j];
+      }
+
+    //step 4: ideal best and ideal worst value of every column
+    double[] best = new double[cols];
+    double[] worst = new double[cols];
+    for (int j = 0; j < cols; j++)
+      {
+	double max = v[0][j];
+	double min = v[0][j];
+	for (int i = 1; i < rows; i++)
 	  {
-	    fogNode[]fog;
-	    int number_of_fogNode;
-	    Scanner sc = new Scanner (System.in);	//System.in is a standard input stream  
-	    System.out.println ("Enter the number of fogNodes");
-	    int n = sc.nextInt ();
-	    fog = new fogNode[n];
-	    for (int i = 0; i < n; i++){
-			fog[i] = new fogNode ();
-			fog[i].Id = i + 1;
-			System.out.println ("enter the following for fog node:" + (i + 1));
-			System.out.println ("power of fognode");
-			fog[i].power_of_fogNode = sc.nextDouble ();
-			System.out.println ("computational power  of fognode");
-			fog[i].computational_power_of_fogNode = sc.nextDouble ();
-			System.out.println ("deadline of fognode");
-			fog[i].deadline = sc.nextDouble ();
-			System.out.println ("inputSize of fognode in Kb");
-			fog[i].inputSize = sc.nextDouble ();
-			System.out.println ("computational_demand of fognode");
-			fog[i].computational_demand = sc.nextDouble ();
-			System.out.println ("enter quota of the fognde:: ");
-			fog[i].quota = sc.nextDouble ();
-		
-			double upload_latency = fog[i].inputSize / (uplink_data_rate * 1000);
-			double download_latency = output_size / (downlink_data_rate * 1000);
-			double computational_latency = (fog[i].computational_demand ) / capacity_of_VRU;
-			criteria_Weight cw = AHP ();
-			fog[i].energy = fog[i].power_of_fogNode * (upload_latency + download_latency) + computational_latency * fog[i].computational_power_of_fogNode;
-			fog[i].weightage = cw.CW_of_Energy_of_fog * fog[i].energy +  cw.CW_of_deadline_of_fog * fog[i].deadline;
-	    }
-	    // sorting the fog nodes based on preference 
-	    for (int i = 0; i < n; i++){
-		for (int j = i + 1; j < n; j++){
-		    if (fog[i].weightage < fog[j].weightage)
-		      {
-				fogNode temp = fog[i];
-				fog[i] = fog[j];
-				fog[j] = temp;
-		      }
-		  }
-	    }
-	    System.out.println ("order of the fog nodes are following\n");
-	    for (int i = 0; i < n; i++)
-	      {
-	    	System.out.print (fog[i].Id + " ");
-	      }
-	    return fog;
+	    max = Math.max (max, v[i][j]);
+	    min = Math.min (min, v[i][j]);
 	  }
+	best[j] = HIGHER_VALUE_FIRST ? max : min;
+	worst[j] = HIGHER_VALUE_FIRST ? min : max;
+      }
+
+    //step 5 + 6: distance to best / worst, then closeness score
+    double[] score = new double[rows];
+    for (int i = 0; i < rows; i++)
+      {
+	double dPlus = 0;
+	double dMinus = 0;
+	for (int j = 0; j < cols; j++)
+	  {
+	    dPlus += (v[i][j] - best[j]) * (v[i][j] - best[j]);
+	    dMinus += (v[i][j] - worst[j]) * (v[i][j] - worst[j]);
+	  }
+	dPlus = Math.sqrt (dPlus);
+	dMinus = Math.sqrt (dMinus);
+	double total = dPlus + dMinus;
+	//if every alternative is identical the score is 0.5 for all of them
+	score[i] = (total > 1e-12) ? dMinus / total : 0.5;
+      }
+    return score;
+  }
+
+
+  public static fogNode[] fogpreference (double downlink_data_rate,
+					 double uplink_data_rate,
+					 double output_size,
+					 double capacity_of_VRU)
+  {
+    fogNode[]fog;
+    Scanner sc = new Scanner (System.in);	//System.in is a standard input stream  
+    System.out.println ("Enter the number of fogNodes");
+    int n = sc.nextInt ();
+    fog = new fogNode[n];
+    for (int i = 0; i < n; i++){
+		fog[i] = new fogNode ();
+		fog[i].Id = i + 1;
+		System.out.println ("enter the following for fog node:" + (i + 1));
+		System.out.println ("power of fognode");
+		fog[i].power_of_fogNode = sc.nextDouble ();
+		System.out.println ("computational power  of fognode");
+		fog[i].computational_power_of_fogNode = sc.nextDouble ();
+		System.out.println ("deadline of fognode");
+		fog[i].deadline = sc.nextDouble ();
+		System.out.println ("inputSize of fognode in Kb");
+		fog[i].inputSize = sc.nextDouble ();
+		System.out.println ("computational_demand of fognode");
+		fog[i].computational_demand = sc.nextDouble ();
+		System.out.println ("enter quota of the fognde:: ");
+		fog[i].quota = sc.nextDouble ();
+	
+		double upload_latency = fog[i].inputSize / (uplink_data_rate * 1000);
+		double download_latency = output_size / (downlink_data_rate * 1000);
+		double computational_latency = (fog[i].computational_demand ) / capacity_of_VRU;
+		fog[i].energy = fog[i].power_of_fogNode * (upload_latency + download_latency) + computational_latency * fog[i].computational_power_of_fogNode;
+    }
+
+    // TOPSIS over all fog nodes: criteria = energy, deadline
+    double[][] decision = new double[n][2];
+    for (int i = 0; i < n; i++)
+      {
+	decision[i][0] = fog[i].energy;
+	decision[i][1] = fog[i].deadline;
+      }
+    double[] score = topsisScores (decision, "fog nodes (energy, deadline)");
+    for (int i = 0; i < n; i++)
+      fog[i].weightage = score[i];
+
+    // sorting the fog nodes based on preference (highest TOPSIS score first)
+    for (int i = 0; i < n; i++){
+	for (int j = i + 1; j < n; j++){
+	    if (fog[i].weightage < fog[j].weightage)
+	      {
+			fogNode temp = fog[i];
+			fog[i] = fog[j];
+			fog[j] = temp;
+	      }
+	  }
+    }
+    System.out.println ("order of the fog nodes are following\n");
+    for (int i = 0; i < n; i++)
+      {
+    	System.out.print (fog[i].Id + " ");
+      }
+    return fog;
+  }
 
 	  //function for both local execution
 	  public static Binarycases both_locally_executed (double
@@ -500,148 +459,143 @@ public class MainRandomInput {
 	  }
 
 
-	  public static iotDevice[] iotpreference (double local_execution_time,
-						   double uplink_time,
-						   double downlink_time,
-						   double power_of_iotd1,
-						   double power_of_iotd2,
-						   double computational_power_of_fognode,
-						   double computational_delay,
-						   double X, double S, double N,
-						   double power_of_fogDevice,
-						   double downlink_data_rate,
-						   double uplink_data_rate,
-						   double output_size,
-						   double capacity_of_VRU)
+  public static iotDevice[] iotpreference (double local_execution_time,
+					   double uplink_time,
+					   double downlink_time,
+					   double power_of_iotd1,
+					   double power_of_iotd2,
+					   double computational_power_of_fognode,
+					   double computational_delay,
+					   double X, double S, double N,
+					   double power_of_fogDevice,
+					   double downlink_data_rate,
+					   double uplink_data_rate,
+					   double output_size,
+					   double capacity_of_VRU)
+  {
+    Scanner sc = new Scanner (System.in);
+    iotDevice[]iot;
+
+    System.out.println ("\nEnter the number of independent task : ");
+    int number_of_indepenenttask = sc.nextInt ();
+    //4 is used for binary cases 
+    int n = number_of_indepenenttask + 4;
+    iot = new iotDevice[n];
+    Binarycases bn = new Binarycases ();
+
+    int range = 4 - 1 + 1;
+
+    for (int i = 0; i < 4; i++)
+      {
+	int random = (int) (Math.random () * range);	//pick one of the 4 binary cases at random
+	caseDistribution[i] = random + 1;
+
+	if (random == 0)
 	  {
-	    Scanner sc = new Scanner (System.in);
-	    iotDevice[]iot;
-	    
-	    System.out.println ("\nEnter the number of independent task : ");
-	    int number_of_indepenenttask = sc.nextInt ();
-	    //4 is used for binary cases 
-	    int n = number_of_indepenenttask + 4;
-	    iot = new iotDevice[n];
-	    Binarycases bn = new Binarycases ();
-
-	    criteria_Weight cw = AHP ();
-	    
-	    int range = 4 - 1 + 1;
-	    
-	    for (int i = 0; i < 4; i++)
-	      {
-	    	int random = (int)(Math.random() * range);
-	    	caseDistribution[i] = random+1;
-	    	
-			if (random == 0)
-			  {
-			    bn = both_locally_executed (local_execution_time, uplink_time,
-						     downlink_time, power_of_iotd1,
-						     power_of_iotd2,
-						     computational_power_of_fognode,
-						     computational_delay, X, S, N,
-						     power_of_fogDevice);
-		
-			  }
-			else if (random == 1)
-			  {
-			    // else if(iotd1_execute_onfognode==1&&iotd2_execute_onfognode==0)
-			    bn = first_onfog_second_locally (local_execution_time, uplink_time,
-							  downlink_time, power_of_iotd1,
-							  power_of_iotd2,
-							  computational_power_of_fognode,
-							  computational_delay, X, S, N,
-							  power_of_fogDevice);
-		
-			  }
-			else if (random == 2)
-			  {
-			    // else if(iotd1_execute_onfognode==0&&iotd2_execute_onfognode==1)
-			    bn = first_locally_second_onfog (local_execution_time, uplink_time,
-							  downlink_time, power_of_iotd1,
-							  power_of_iotd2,
-							  computational_power_of_fognode,
-							  computational_delay, X, S, N,
-							  power_of_fogDevice);
-		
-			  }
-			else
-			  {
-			    // else 
-			    bn = both_onfog (local_execution_time, uplink_time, downlink_time,
-					  power_of_iotd1, power_of_iotd2,
-					  computational_power_of_fognode, computational_delay,
-					  X, S, N, power_of_fogDevice);
-			  }
-	   		  iot[i] = new iotDevice ();
-			  iot[i].Id = i + 1;
-			  iot[i].energy = bn.energy;
-			  iot[i].dependency = 2;
-			  iot[i].latency = bn.total_time;
-			  iot[i].computational_demand = 210;
-			  iot[i].inputSize = 400;
-			  iot[i].weightage =  cw.CW_of_Energy_of_iot * iot[i].energy +
-					  	cw.CW_of_Computational_demand_of_iot * iot[i].computational_demand +cw.CW_of_Latency_of_iot * iot[i].latency;
-	      }
-	    
-	    
-	    for (int i = 4; i < n; i++)
-		{
-			iot[i] = new iotDevice ();
-			iot[i].Id = i + 1;
-			iot[i].dependency = 1;
-			System.out.println ("enter computational demand of  task :: " + (i + 1));
-			iot[i].computational_demand = sc.nextDouble ();
-			System.out.println ("enter inputSize of " + " task:: " + (i + 1));
-			iot[i].inputSize = sc.nextDouble ();
-			if (iot[i].computational_demand < 300)	//if computational demand is less than 300 then it'll be executed locally
-			  {
-			    iot[i].latency = iot[i].computational_demand / 16;
-			    iot[i].energy = power_of_iotd1 * iot[i].latency;
-			  }
-			else
-			  {
-			    //executing on fog node
-			    iot[i].latency = (iot[i].inputSize / (uplink_data_rate * 1000) +	//upload
-					      (iot[i].computational_demand) /  capacity_of_VRU +	//computational
-					      (output_size / (downlink_data_rate * 1000)));	//download
-			    iot[i].energy = power_of_fogDevice * (iot[i].inputSize /
-						    (uplink_data_rate * 1000) +
-						    output_size / (downlink_data_rate * 1000)) +
-			      computational_power_of_fognode * (iot[i].computational_demand) /  capacity_of_VRU;
-			    
-			  }
-			//calculating weightage for ranking purpose
-			iot[i].weightage =
-			  cw.CW_of_Energy_of_iot * iot[i].energy +
-			  cw.CW_of_Computational_demand_of_iot * iot[i].computational_demand +
-			  cw.CW_of_Latency_of_iot * iot[i].latency;
-		 }
-
-	    //ordering the iot devices according to their weighttage of criteria weights
-	    for (int i = 0; i < n; i++)
-		  {
-			for (int j = i + 1; j < n; j++)
-			  {
-			    if (iot[i].weightage < iot[j].weightage)
-			      {
-				iotDevice temp = iot[i];
-				iot[i] = iot[j];
-				iot[j] = temp;
-			      }
-			  }
-		   }
-	    
-	    System.out.println ("order of the iot devices are following\n");
-	    for (int i = 0; i < n; i++)
-	      {
-	    	System.out.print (iot[i].Id + " ");
-	      }
-	    
-	    System.out.println ("\n");
-	    return iot;
+	    bn = both_locally_executed (local_execution_time, uplink_time,
+					downlink_time, power_of_iotd1,
+					power_of_iotd2,
+					computational_power_of_fognode,
+					computational_delay, X, S, N,
+					power_of_fogDevice);
 	  }
+	else if (random == 1)
+	  {
+	    bn = first_onfog_second_locally (local_execution_time, uplink_time,
+					     downlink_time, power_of_iotd1,
+					     power_of_iotd2,
+					     computational_power_of_fognode,
+					     computational_delay, X, S, N,
+					     power_of_fogDevice);
+	  }
+	else if (random == 2)
+	  {
+	    bn = first_locally_second_onfog (local_execution_time, uplink_time,
+					     downlink_time, power_of_iotd1,
+					     power_of_iotd2,
+					     computational_power_of_fognode,
+					     computational_delay, X, S, N,
+					     power_of_fogDevice);
+	  }
+	else
+	  {
+	    bn = both_onfog (local_execution_time, uplink_time, downlink_time,
+			     power_of_iotd1, power_of_iotd2,
+			     computational_power_of_fognode, computational_delay,
+			     X, S, N, power_of_fogDevice);
+	  }
+	iot[i] = new iotDevice ();
+	iot[i].Id = i + 1;
+	iot[i].energy = bn.energy;
+	iot[i].dependency = 2;
+	iot[i].latency = bn.total_time;
+	iot[i].computational_demand = 210;
+	iot[i].inputSize = 400;
+      }
 
+    for (int i = 4; i < n; i++)
+      {
+	iot[i] = new iotDevice ();
+	iot[i].Id = i + 1;
+	iot[i].dependency = 1;
+	System.out.println ("enter computational demand of  task :: " + (i + 1));
+	iot[i].computational_demand = sc.nextDouble ();
+	System.out.println ("enter inputSize of " + " task:: " + (i + 1));
+	iot[i].inputSize = sc.nextDouble ();
+	if (iot[i].computational_demand < 300)	//if computational demand is less than 300 then it'll be executed locally
+	  {
+	    iot[i].latency = iot[i].computational_demand / 16;
+	    iot[i].energy = power_of_iotd1 * iot[i].latency;
+	  }
+	else
+	  {
+	    //executing on fog node
+	    iot[i].latency = (iot[i].inputSize / (uplink_data_rate * 1000) +	//upload
+			      (iot[i].computational_demand) /  capacity_of_VRU +	//computational
+			      (output_size / (downlink_data_rate * 1000)));	//download
+	    iot[i].energy = power_of_fogDevice * (iot[i].inputSize /
+				    (uplink_data_rate * 1000) +
+				    output_size / (downlink_data_rate * 1000)) +
+	      computational_power_of_fognode * (iot[i].computational_demand) /  capacity_of_VRU;
+	  }
+      }
+
+    // TOPSIS over all tasks: criteria = energy, computational demand, latency
+    double[][] decision = new double[n][3];
+    for (int i = 0; i < n; i++)
+      {
+	decision[i][0] = iot[i].energy;
+	decision[i][1] = iot[i].computational_demand;
+	decision[i][2] = iot[i].latency;
+      }
+    double[] score =
+      topsisScores (decision, "IoT tasks (energy, computational demand, latency)");
+    for (int i = 0; i < n; i++)
+      iot[i].weightage = score[i];
+
+    //ordering the iot devices according to their TOPSIS score (highest first)
+    for (int i = 0; i < n; i++)
+      {
+	for (int j = i + 1; j < n; j++)
+	  {
+	    if (iot[i].weightage < iot[j].weightage)
+	      {
+		iotDevice temp = iot[i];
+		iot[i] = iot[j];
+		iot[j] = temp;
+	      }
+	  }
+      }
+
+    System.out.println ("order of the iot devices are following\n");
+    for (int i = 0; i < n; i++)
+      {
+	System.out.print (iot[i].Id + " ");
+      }
+
+    System.out.println ("\n");
+    return iot;
+  }
 
 	  public static double log10 (int x)
 	  {
